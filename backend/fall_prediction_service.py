@@ -1,4 +1,5 @@
 import os
+
 import numpy as np
 import tensorflow as tf
 from dotenv import load_dotenv
@@ -10,17 +11,27 @@ from supabase import create_client, Client
 load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-VITALCARE_ALERT_USER_ID = os.getenv("VITALCARE_ALERT_USER_ID")
+SUPABASE_SERVICE_ROLE_KEY = os.getenv(
+    "SUPABASE_SERVICE_ROLE_KEY"
+)
+VITALCARE_ALERT_USER_ID = os.getenv(
+    "VITALCARE_ALERT_USER_ID"
+)
 
 if not SUPABASE_URL:
-    raise RuntimeError("SUPABASE_URL is missing from backend/.env")
+    raise RuntimeError(
+        "SUPABASE_URL is missing from backend/.env"
+    )
 
 if not SUPABASE_SERVICE_ROLE_KEY:
-    raise RuntimeError("SUPABASE_SERVICE_ROLE_KEY is missing from backend/.env")
+    raise RuntimeError(
+        "SUPABASE_SERVICE_ROLE_KEY is missing from backend/.env"
+    )
 
 if not VITALCARE_ALERT_USER_ID:
-    raise RuntimeError("VITALCARE_ALERT_USER_ID is missing from backend/.env")
+    raise RuntimeError(
+        "VITALCARE_ALERT_USER_ID is missing from backend/.env"
+    )
 
 supabase: Client = create_client(
     SUPABASE_URL,
@@ -50,6 +61,7 @@ app.add_middleware(
         "http://localhost:5174",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "https://vitalcare-professional.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -61,7 +73,12 @@ print("Loading VitalCare fall detection model...")
 model = tf.keras.models.load_model(MODEL_PATH)
 
 print("TensorFlow:", tf.__version__)
-print("Model:", model.input_shape, "->", model.output_shape)
+print(
+    "Model:",
+    model.input_shape,
+    "->",
+    model.output_shape,
+)
 print("Supabase connection configured.")
 print("Fall prediction service ready.")
 
@@ -92,9 +109,7 @@ def health():
 
 
 def create_fall_alert():
-
     try:
-
         alert_data = {
             "user_id": VITALCARE_ALERT_USER_ID,
             "title": "Fall Detected",
@@ -107,14 +122,15 @@ def create_fall_alert():
             "status": "Unread",
         }
 
-        supabase.table("alerts").insert(alert_data).execute()
+        supabase.table("alerts").insert(
+            alert_data
+        ).execute()
 
         print("🚨 FALL ALERT CREATED")
 
         return True
 
     except Exception as error:
-
         print("ERROR CREATING FALL ALERT:")
         print(error)
 
@@ -123,7 +139,6 @@ def create_fall_alert():
 
 @app.post("/predict")
 def predict(request: PredictionRequest):
-
     global high_probability_count
 
     landmarks = np.array(
@@ -137,7 +152,6 @@ def predict(request: PredictionRequest):
     )
 
     if landmarks.shape != expected_shape:
-
         raise HTTPException(
             status_code=400,
             detail=(
@@ -176,14 +190,18 @@ def predict(request: PredictionRequest):
     alert_created = False
 
     if fall_confirmed:
-
         alert_created = create_fall_alert()
-
         high_probability_count = 0
 
     return {
-        "fall_probability": round(probability, 4),
-        "fall_percentage": round(probability * 100, 2),
+        "fall_probability": round(
+            probability,
+            4,
+        ),
+        "fall_percentage": round(
+            probability * 100,
+            2,
+        ),
         "prediction": prediction,
         "threshold": FALL_THRESHOLD,
         "consecutive_high_windows": high_probability_count,
