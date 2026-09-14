@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+
 import {
   Camera,
   CameraOff,
@@ -77,50 +78,83 @@ export default function CameraMonitoring() {
   const sequenceRef = useRef([]);
   const framesSincePredictionRef = useRef(0);
   const poseProcessingRef = useRef(false);
+
   const highProbabilityWindowsRef = useRef(0);
 
   const mountedRef = useRef(true);
 
-  const [cameras, setCameras] = useState(initialCameras);
-  const [selectedCameraId, setSelectedCameraId] = useState(1);
+  const [cameras, setCameras] =
+    useState(initialCameras);
 
-  const [isCameraOn, setIsCameraOn] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
+  const [selectedCameraId, setSelectedCameraId] =
+    useState(1);
 
-  const [recordings, setRecordings] = useState([]);
-  const [selectedRecording, setSelectedRecording] = useState(null);
+  const [isCameraOn, setIsCameraOn] =
+    useState(false);
 
-  const [showAddCamera, setShowAddCamera] = useState(false);
-  const [newCameraName, setNewCameraName] = useState("");
-  const [newCameraLocation, setNewCameraLocation] = useState("");
+  const [isRecording, setIsRecording] =
+    useState(false);
 
-  const [cameraError, setCameraError] = useState("");
-  const [aiError, setAiError] = useState("");
+  const [recordings, setRecordings] =
+    useState([]);
 
-  const [aiStatus, setAiStatus] = useState("Waiting");
-  const [aiConnected, setAiConnected] = useState(false);
+  const [selectedRecording, setSelectedRecording] =
+    useState(null);
 
-  const [fallProbability, setFallProbability] = useState(0);
-  const [prediction, setPrediction] = useState("WAITING");
-  const [fallConfirmed, setFallConfirmed] = useState(false);
+  const [showAddCamera, setShowAddCamera] =
+    useState(false);
+
+  const [newCameraName, setNewCameraName] =
+    useState("");
+
+  const [newCameraLocation, setNewCameraLocation] =
+    useState("");
+
+  const [cameraError, setCameraError] =
+    useState("");
+
+  const [aiError, setAiError] =
+    useState("");
+
+  const [aiStatus, setAiStatus] =
+    useState("Waiting");
+
+  const [aiConnected, setAiConnected] =
+    useState(false);
+
+  const [fallProbability, setFallProbability] =
+    useState(0);
+
+  const [prediction, setPrediction] =
+    useState("WAITING");
+
+  const [fallConfirmed, setFallConfirmed] =
+    useState(false);
 
   const [
     consecutiveHighWindows,
     setConsecutiveHighWindows,
   ] = useState(0);
 
-  const [poseFrames, setPoseFrames] = useState(0);
-  const [sequenceFrames, setSequenceFrames] = useState(0);
+  const [poseFrames, setPoseFrames] =
+    useState(0);
 
-  const [inactivitySeconds, setInactivitySeconds] = useState(0);
+  const [sequenceFrames, setSequenceFrames] =
+    useState(0);
+
+  const [inactivitySeconds, setInactivitySeconds] =
+    useState(0);
+
   const [inactivityStatus, setInactivityStatus] =
     useState("Normal");
 
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [recordingSeconds, setRecordingSeconds] =
+    useState(0);
 
   const selectedCamera =
     cameras.find(
-      (camera) => camera.id === selectedCameraId
+      (camera) =>
+        camera.id === selectedCameraId
     ) || cameras[0];
 
   /* ============================================================
@@ -130,37 +164,132 @@ export default function CameraMonitoring() {
   useEffect(() => {
     mountedRef.current = true;
 
-    const existingScript = document.querySelector(
-      'script[data-vitalcare-mediapipe="pose"]'
-    );
+    const loadMediaPipe = () => {
+      return new Promise((resolve, reject) => {
+        // MediaPipe already loaded
+        if (
+          window.Pose &&
+          typeof window.Pose === "function"
+        ) {
+          console.log(
+            "MediaPipe Pose is already available."
+          );
 
-    if (existingScript) {
-      console.log("MediaPipe script already exists.");
-    } else {
-      const script = document.createElement("script");
+          resolve();
+          return;
+        }
 
-      script.src =
-        "https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js";
+        // Script already exists but may still be loading
+        const existingScript =
+          document.querySelector(
+            'script[data-vitalcare-mediapipe="pose"]'
+          );
 
-      script.async = true;
-      script.dataset.vitalcareMediapipe = "pose";
+        if (existingScript) {
+          console.log(
+            "MediaPipe Pose script already exists. Waiting for load..."
+          );
 
-      script.onload = () => {
-        console.log("MediaPipe Pose script loaded.");
-      };
+          let attempts = 0;
+          const maxAttempts = 40;
 
-      script.onerror = () => {
-        console.error("Could not load MediaPipe Pose.");
+          const checkLoaded = () => {
+            if (
+              window.Pose &&
+              typeof window.Pose ===
+                "function"
+            ) {
+              resolve();
+              return;
+            }
+
+            attempts += 1;
+
+            if (attempts >= maxAttempts) {
+              reject(
+                new Error(
+                  "MediaPipe Pose did not become available."
+                )
+              );
+              return;
+            }
+
+            setTimeout(
+              checkLoaded,
+              250
+            );
+          };
+
+          checkLoaded();
+          return;
+        }
+
+        // Create MediaPipe script
+        const script =
+          document.createElement("script");
+
+        script.src =
+          "https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js";
+
+        script.async = true;
+
+        script.dataset.vitalcareMediapipe =
+          "pose";
+
+        script.onload = () => {
+          console.log(
+            "MediaPipe Pose script loaded successfully."
+          );
+
+          if (
+            window.Pose &&
+            typeof window.Pose ===
+              "function"
+          ) {
+            resolve();
+          } else {
+            reject(
+              new Error(
+                "MediaPipe Pose loaded but window.Pose is unavailable."
+              )
+            );
+          }
+        };
+
+        script.onerror = () => {
+          console.error(
+            "Could not load MediaPipe Pose."
+          );
+
+          reject(
+            new Error(
+              "Could not load MediaPipe Pose."
+            )
+          );
+        };
+
+        document.body.appendChild(script);
+      });
+    };
+
+    loadMediaPipe()
+      .then(() => {
+        console.log(
+          "MediaPipe Pose is ready."
+        );
+      })
+      .catch((error) => {
+        console.error(
+          "MediaPipe initialization error:",
+          error
+        );
 
         if (mountedRef.current) {
           setAiError(
-            "Could not load MediaPipe Pose. Check your internet connection."
+            "Could not load MediaPipe Pose. Please refresh the page."
           );
         }
-      };
-
-      document.body.appendChild(script);
-    }
+      });
 
     return () => {
       mountedRef.current = false;
@@ -176,31 +305,47 @@ export default function CameraMonitoring() {
 
     async function checkAIBackend() {
       try {
-        const response = await fetch(AI_HEALTH_URL);
+        const response =
+          await fetch(AI_HEALTH_URL);
 
         if (!response.ok) {
-          throw new Error("AI backend health check failed.");
+          throw new Error(
+            `AI backend health check returned ${response.status}`
+          );
         }
 
-        const data = await response.json();
+        const data =
+          await response.json();
 
-        console.log("VitalCare AI backend:", data);
+        console.log(
+          "VitalCare AI backend:",
+          data
+        );
 
         if (!cancelled) {
-          setAiConnected(Boolean(data.model_loaded));
+          setAiConnected(
+            Boolean(data.model_loaded)
+          );
+
           setAiError("");
 
           if (data.model_loaded) {
-            setAiStatus("AI backend connected");
+            setAiStatus(
+              "AI backend connected"
+            );
           }
         }
       } catch (error) {
-        console.error("AI backend unavailable:", error);
+        console.error(
+          "AI backend unavailable:",
+          error
+        );
 
         if (!cancelled) {
           setAiConnected(false);
+
           setAiError(
-            "AI backend is not connected. Make sure FastAPI is running on port 8001."
+            "AI backend is not connected. Please check the VitalCare AI service."
           );
         }
       }
@@ -234,12 +379,15 @@ export default function CameraMonitoring() {
 
     const video = videoRef.current;
 
-    video.srcObject = mediaStreamRef.current;
+    video.srcObject =
+      mediaStreamRef.current;
 
     video
       .play()
       .then(() => {
-        console.log("Video playback started.");
+        console.log(
+          "Video playback started."
+        );
 
         startPoseDetection();
       })
@@ -260,7 +408,8 @@ export default function CameraMonitoring() {
           animationFrameRef.current
         );
 
-        animationFrameRef.current = null;
+        animationFrameRef.current =
+          null;
       }
     };
   }, [isCameraOn]);
@@ -280,7 +429,8 @@ export default function CameraMonitoring() {
       );
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () =>
+      clearInterval(interval);
   }, [isRecording]);
 
   /* ============================================================
@@ -291,24 +441,32 @@ export default function CameraMonitoring() {
     if (!isCameraOn) {
       setInactivitySeconds(0);
       setInactivityStatus("Normal");
+
       return;
     }
 
     const interval = setInterval(() => {
-      setInactivitySeconds((previous) => {
-        const next = previous + 1;
+      setInactivitySeconds(
+        (previous) => {
+          const next = previous + 1;
 
-        if (next >= 300) {
-          setInactivityStatus("Attention");
-        } else {
-          setInactivityStatus("Normal");
+          if (next >= 300) {
+            setInactivityStatus(
+              "Attention"
+            );
+          } else {
+            setInactivityStatus(
+              "Normal"
+            );
+          }
+
+          return next;
         }
-
-        return next;
-      });
+      );
     }, 1000);
 
-    return () => clearInterval(interval);
+    return () =>
+      clearInterval(interval);
   }, [isCameraOn]);
 
   /* ============================================================
@@ -339,12 +497,16 @@ export default function CameraMonitoring() {
       if (mediaStreamRef.current) {
         mediaStreamRef.current
           .getTracks()
-          .forEach((track) => track.stop());
+          .forEach((track) =>
+            track.stop()
+          );
       }
 
       recordings.forEach((recording) => {
         if (recording.url) {
-          URL.revokeObjectURL(recording.url);
+          URL.revokeObjectURL(
+            recording.url
+          );
         }
       });
     };
@@ -384,7 +546,9 @@ export default function CameraMonitoring() {
       minTrackingConfidence: 0.5,
     });
 
-    pose.onResults(processPoseResults);
+    pose.onResults(
+      processPoseResults
+    );
 
     return pose;
   }
@@ -393,11 +557,12 @@ export default function CameraMonitoring() {
      START POSE DETECTION
   ============================================================ */
 
-  function startPoseDetection() {
+  async function startPoseDetection() {
     if (!videoRef.current) {
       console.warn(
         "Video element is not available."
       );
+
       return;
     }
 
@@ -405,6 +570,47 @@ export default function CameraMonitoring() {
       console.log(
         "MediaPipe Pose already running."
       );
+
+      return;
+    }
+
+    setAiStatus(
+      "Waiting for MediaPipe..."
+    );
+
+    setAiError("");
+
+    // Wait for MediaPipe to be ready
+    let attempts = 0;
+    const maxAttempts = 40;
+
+    while (
+      (!window.Pose ||
+        typeof window.Pose !==
+          "function") &&
+      attempts < maxAttempts &&
+      mountedRef.current
+    ) {
+      await new Promise((resolve) =>
+        setTimeout(resolve, 250)
+      );
+
+      attempts += 1;
+    }
+
+    if (!window.Pose) {
+      console.error(
+        "MediaPipe Pose is not available after waiting."
+      );
+
+      setAiStatus(
+        "Pose detection unavailable"
+      );
+
+      setAiError(
+        "MediaPipe Pose could not be initialized. Please refresh the page."
+      );
+
       return;
     }
 
@@ -416,37 +622,49 @@ export default function CameraMonitoring() {
 
     poseRef.current = pose;
 
-    setAiStatus("MediaPipe starting...");
-    setAiError("");
+    console.log(
+      "MediaPipe Pose instance created."
+    );
+
+    setAiStatus(
+      "MediaPipe starting..."
+    );
 
     let stopped = false;
 
     const processFrame = async () => {
       if (
         stopped ||
-        !mountedRef.current
+        !mountedRef.current ||
+        !poseRef.current
       ) {
         return;
       }
 
-      if (!videoRef.current) {
+      const video =
+        videoRef.current;
+
+      if (!video) {
         animationFrameRef.current =
           requestAnimationFrame(
             processFrame
           );
+
         return;
       }
 
-      const video = videoRef.current;
-
-      if (
+      const videoReady =
         video.readyState >= 2 &&
         video.videoWidth > 0 &&
-        video.videoHeight > 0 &&
+        video.videoHeight > 0;
+
+      if (
+        videoReady &&
         !poseProcessingRef.current
       ) {
         try {
-          poseProcessingRef.current = true;
+          poseProcessingRef.current =
+            true;
 
           await pose.send({
             image: video,
@@ -457,14 +675,21 @@ export default function CameraMonitoring() {
             error
           );
         } finally {
-          poseProcessingRef.current = false;
+          poseProcessingRef.current =
+            false;
         }
       }
 
-      animationFrameRef.current =
-        requestAnimationFrame(
-          processFrame
-        );
+      if (
+        mountedRef.current &&
+        poseRef.current &&
+        !stopped
+      ) {
+        animationFrameRef.current =
+          requestAnimationFrame(
+            processFrame
+          );
+      }
     };
 
     animationFrameRef.current =
@@ -477,7 +702,9 @@ export default function CameraMonitoring() {
      PROCESS MEDIAPIPE RESULTS
   ============================================================ */
 
-  function processPoseResults(results) {
+  function processPoseResults(
+    results
+  ) {
     if (!mountedRef.current) {
       return;
     }
@@ -486,7 +713,10 @@ export default function CameraMonitoring() {
       !results ||
       !results.poseLandmarks
     ) {
-      setAiStatus("Pose not detected");
+      setAiStatus(
+        "Pose not detected"
+      );
+
       return;
     }
 
@@ -517,7 +747,8 @@ export default function CameraMonitoring() {
     }
 
     if (
-      features.length !== FEATURE_COUNT
+      features.length !==
+      FEATURE_COUNT
     ) {
       console.warn(
         `Expected ${FEATURE_COUNT} features but received ${features.length}`
@@ -556,7 +787,8 @@ export default function CameraMonitoring() {
       return;
     }
 
-    framesSincePredictionRef.current += 1;
+    framesSincePredictionRef.current +=
+      1;
 
     setAiStatus(
       "Pose detected • AI processing"
@@ -566,13 +798,16 @@ export default function CameraMonitoring() {
       framesSincePredictionRef.current >=
       WINDOW_STEP
     ) {
-      framesSincePredictionRef.current = 0;
+      framesSincePredictionRef.current =
+        0;
 
       const sequence = [
         ...sequenceRef.current,
       ];
 
-      sendSequenceToAI(sequence);
+      sendSequenceToAI(
+        sequence
+      );
     }
   }
 
@@ -580,7 +815,9 @@ export default function CameraMonitoring() {
      SEND SEQUENCE TO FASTAPI
   ============================================================ */
 
-  async function sendSequenceToAI(sequence) {
+  async function sendSequenceToAI(
+    sequence
+  ) {
     if (
       !sequence ||
       sequence.length !==
@@ -590,19 +827,20 @@ export default function CameraMonitoring() {
     }
 
     try {
-      const response = await fetch(
-        AI_API_URL,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            landmarks: sequence,
-          }),
-        }
-      );
+      const response =
+        await fetch(
+          AI_API_URL,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              landmarks: sequence,
+            }),
+          }
+        );
 
       if (!response.ok) {
         throw new Error(
@@ -634,21 +872,24 @@ export default function CameraMonitoring() {
           data.fall_percentage / 100;
       }
 
-      const percentage = Math.max(
-        0,
-        Math.min(
-          100,
-          probability * 100
-        )
-      );
+      const percentage =
+        Math.max(
+          0,
+          Math.min(
+            100,
+            probability * 100
+          )
+        );
 
       setFallProbability(
         percentage
       );
 
       const predictedFall =
-        data.prediction === "FALL" ||
-        percentage >= FALL_THRESHOLD;
+        data.prediction ===
+          "FALL" ||
+        percentage >=
+          FALL_THRESHOLD;
 
       setPrediction(
         predictedFall
@@ -668,7 +909,8 @@ export default function CameraMonitoring() {
         highProbabilityWindowsRef.current +=
           1;
       } else {
-        highProbabilityWindowsRef.current = 0;
+        highProbabilityWindowsRef.current =
+          0;
       }
 
       const currentHighWindows =
@@ -679,7 +921,8 @@ export default function CameraMonitoring() {
       );
 
       const backendConfirmed =
-        data.fall_confirmed === true;
+        data.fall_confirmed ===
+        true;
 
       const confirmed =
         backendConfirmed ||
@@ -694,7 +937,9 @@ export default function CameraMonitoring() {
         setAiStatus(
           "🚨 FALL CONFIRMED"
         );
-      } else if (predictedFall) {
+      } else if (
+        predictedFall
+      ) {
         setAiStatus(
           "High fall probability"
         );
@@ -734,7 +979,8 @@ export default function CameraMonitoring() {
 
       if (
         !navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia
+        !navigator.mediaDevices
+          .getUserMedia
       ) {
         throw new Error(
           "Your browser does not support webcam access."
@@ -766,14 +1012,16 @@ export default function CameraMonitoring() {
 
       setCameras(
         (previous) =>
-          previous.map((camera) =>
-            camera.id ===
-            selectedCameraId
-              ? {
-                  ...camera,
-                  status: "Online",
-                }
-              : camera
+          previous.map(
+            (camera) =>
+              camera.id ===
+              selectedCameraId
+                ? {
+                    ...camera,
+                    status:
+                      "Online",
+                  }
+                : camera
           )
       );
 
@@ -832,7 +1080,8 @@ export default function CameraMonitoring() {
           track.stop()
         );
 
-      mediaStreamRef.current = null;
+      mediaStreamRef.current =
+        null;
     }
 
     if (videoRef.current) {
@@ -841,19 +1090,23 @@ export default function CameraMonitoring() {
     }
 
     setIsCameraOn(false);
+
     setIsRecording(false);
+
     setRecordingSeconds(0);
 
     setCameras(
       (previous) =>
-        previous.map((camera) =>
-          camera.id ===
-          selectedCameraId
-            ? {
-                ...camera,
-                status: "Offline",
-              }
-            : camera
+        previous.map(
+          (camera) =>
+            camera.id ===
+            selectedCameraId
+              ? {
+                  ...camera,
+                  status:
+                    "Offline",
+                }
+              : camera
         )
     );
 
@@ -867,22 +1120,30 @@ export default function CameraMonitoring() {
   function resetAIState() {
     sequenceRef.current = [];
 
-    framesSincePredictionRef.current = 0;
+    framesSincePredictionRef.current =
+      0;
 
-    highProbabilityWindowsRef.current = 0;
+    highProbabilityWindowsRef.current =
+      0;
 
     setFallProbability(0);
+
     setPrediction("WAITING");
+
     setFallConfirmed(false);
 
     setConsecutiveHighWindows(0);
 
     setPoseFrames(0);
+
     setSequenceFrames(0);
 
     setAiStatus("Waiting");
 
+    setAiError("");
+
     setInactivitySeconds(0);
+
     setInactivityStatus("Normal");
   }
 
@@ -891,7 +1152,9 @@ export default function CameraMonitoring() {
   ============================================================ */
 
   function startRecording() {
-    if (!mediaStreamRef.current) {
+    if (
+      !mediaStreamRef.current
+    ) {
       setCameraError(
         "Start the camera before recording."
       );
@@ -910,7 +1173,8 @@ export default function CameraMonitoring() {
         )
       ) {
         options = {
-          mimeType: "video/webm",
+          mimeType:
+            "video/webm",
         };
       }
 
@@ -936,32 +1200,31 @@ export default function CameraMonitoring() {
         };
 
       recorder.onstop = () => {
-        const blob = new Blob(
-          chunks,
-          {
-            type:
-              recorder.mimeType ||
-              "video/webm",
-          }
-        );
+        const blob =
+          new Blob(
+            chunks,
+            {
+              type:
+                recorder.mimeType ||
+                "video/webm",
+            }
+          );
 
         const url =
-          URL.createObjectURL(blob);
+          URL.createObjectURL(
+            blob
+          );
 
         const recording = {
           id: Date.now(),
-
           name: `Camera Recording ${new Date().toLocaleTimeString()}`,
-
           camera:
             selectedCamera?.name ||
             "Camera",
-
           duration:
             recordingSeconds,
-
-          createdAt: new Date(),
-
+          createdAt:
+            new Date(),
           url,
         };
 
@@ -976,18 +1239,21 @@ export default function CameraMonitoring() {
       recorder.start();
 
       setRecordingSeconds(0);
+
       setIsRecording(true);
 
       setCameras(
         (previous) =>
-          previous.map((camera) =>
-            camera.id ===
-            selectedCameraId
-              ? {
-                  ...camera,
-                  status: "Recording",
-                }
-              : camera
+          previous.map(
+            (camera) =>
+              camera.id ===
+              selectedCameraId
+                ? {
+                    ...camera,
+                    status:
+                      "Recording",
+                  }
+                : camera
           )
       );
     } catch (error) {
@@ -1009,7 +1275,8 @@ export default function CameraMonitoring() {
   function stopRecording() {
     if (
       mediaRecorderRef.current &&
-      mediaRecorderRef.current.state !==
+      mediaRecorderRef.current
+        .state !==
         "inactive"
     ) {
       mediaRecorderRef.current.stop();
@@ -1019,20 +1286,23 @@ export default function CameraMonitoring() {
       null;
 
     setIsRecording(false);
+
     setRecordingSeconds(0);
 
     setCameras(
       (previous) =>
-        previous.map((camera) =>
-          camera.id ===
-          selectedCameraId
-            ? {
-                ...camera,
-                status: isCameraOn
-                  ? "Online"
-                  : "Offline",
-              }
-            : camera
+        previous.map(
+          (camera) =>
+            camera.id ===
+            selectedCameraId
+              ? {
+                  ...camera,
+                  status:
+                    isCameraOn
+                      ? "Online"
+                      : "Offline",
+                }
+              : camera
         )
     );
   }
@@ -1042,20 +1312,19 @@ export default function CameraMonitoring() {
   ============================================================ */
 
   function addCamera() {
-    if (!newCameraName.trim()) {
+    if (
+      !newCameraName.trim()
+    ) {
       return;
     }
 
     const newCamera = {
       id: Date.now(),
-
       name:
         newCameraName.trim(),
-
       location:
         newCameraLocation.trim() ||
         "Not specified",
-
       status: "Offline",
     };
 
@@ -1071,6 +1340,7 @@ export default function CameraMonitoring() {
     );
 
     setNewCameraName("");
+
     setNewCameraLocation("");
 
     setShowAddCamera(false);
@@ -1096,7 +1366,9 @@ export default function CameraMonitoring() {
 
       setCameras(remaining);
 
-      if (remaining.length > 0) {
+      if (
+        remaining.length > 0
+      ) {
         setSelectedCameraId(
           remaining[0].id
         );
@@ -1117,7 +1389,9 @@ export default function CameraMonitoring() {
   ============================================================ */
 
   function selectCamera(id) {
-    if (id === selectedCameraId) {
+    if (
+      id === selectedCameraId
+    ) {
       return;
     }
 
@@ -1126,6 +1400,7 @@ export default function CameraMonitoring() {
     }
 
     setSelectedCameraId(id);
+
     resetAIState();
   }
 
@@ -1136,12 +1411,11 @@ export default function CameraMonitoring() {
   function deleteRecording(id) {
     const recording =
       recordings.find(
-        (item) => item.id === id
+        (item) =>
+          item.id === id
       );
 
-    if (
-      recording?.url
-    ) {
+    if (recording?.url) {
       URL.revokeObjectURL(
         recording.url
       );
@@ -1180,8 +1454,8 @@ export default function CameraMonitoring() {
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* HEADER */}
 
+        {/* HEADER */}
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-3">
@@ -1213,13 +1487,14 @@ export default function CameraMonitoring() {
         </div>
 
         {/* CAMERA SELECTOR */}
-
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {cameras.map((camera) => (
             <div
               key={camera.id}
               onClick={() =>
-                selectCamera(camera.id)
+                selectCamera(
+                  camera.id
+                )
               }
               className={`cursor-pointer rounded-2xl border bg-white p-4 shadow-sm transition ${
                 camera.id ===
@@ -1252,13 +1527,9 @@ export default function CameraMonitoring() {
                 <div className="flex items-center gap-2 text-sm text-slate-500">
                   {camera.status ===
                   "Offline" ? (
-                    <WifiOff
-                      size={16}
-                    />
+                    <WifiOff size={16} />
                   ) : (
-                    <Wifi
-                      size={16}
-                    />
+                    <Wifi size={16} />
                   )}
 
                   Camera {camera.id}
@@ -1269,6 +1540,7 @@ export default function CameraMonitoring() {
                   <button
                     onClick={(event) => {
                       event.stopPropagation();
+
                       deleteCamera(
                         camera.id
                       );
@@ -1286,24 +1558,25 @@ export default function CameraMonitoring() {
         </div>
 
         {/* ERROR */}
-
         {cameraError && (
           <div className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             <AlertTriangle
               size={20}
             />
 
-            <span>{cameraError}</span>
+            <span>
+              {cameraError}
+            </span>
           </div>
         )}
 
         {/* MAIN CONTENT */}
-
         <div className="grid gap-6 xl:grid-cols-3">
-          {/* VIDEO */}
 
+          {/* VIDEO */}
           <div className="xl:col-span-2">
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
               <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                 <div>
                   <h2 className="font-bold text-slate-900">
@@ -1324,6 +1597,7 @@ export default function CameraMonitoring() {
                         size={9}
                         fill="currentColor"
                       />
+
                       Recording{" "}
                       {formatTime(
                         recordingSeconds
@@ -1345,7 +1619,7 @@ export default function CameraMonitoring() {
                 </div>
               </div>
 
-              {/* VIDEO ELEMENT IS ALWAYS RENDERED */}
+              {/* VIDEO */}
               <div className="relative aspect-video bg-slate-950">
                 <video
                   ref={videoRef}
@@ -1396,6 +1670,7 @@ export default function CameraMonitoring() {
                           size={17}
                           fill="currentColor"
                         />
+
                         Record
                       </button>
                     ) : (
@@ -1409,6 +1684,7 @@ export default function CameraMonitoring() {
                           size={16}
                           fill="currentColor"
                         />
+
                         Stop Recording
                       </button>
                     )}
@@ -1425,6 +1701,7 @@ export default function CameraMonitoring() {
                     className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700"
                   >
                     <Play size={18} />
+
                     Start Camera
                   </button>
                 ) : (
@@ -1437,6 +1714,7 @@ export default function CameraMonitoring() {
                     <CameraOff
                       size={18}
                     />
+
                     Stop Camera
                   </button>
                 )}
@@ -1445,9 +1723,10 @@ export default function CameraMonitoring() {
           </div>
 
           {/* AI PANEL */}
-
           <div className="space-y-6">
+
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
               <div className="mb-5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="rounded-xl bg-purple-100 p-2.5 text-purple-600">
@@ -1524,6 +1803,7 @@ export default function CameraMonitoring() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+
                 <div className="rounded-xl border border-slate-200 p-3">
                   <p className="text-xs text-slate-500">
                     Prediction
@@ -1561,6 +1841,7 @@ export default function CameraMonitoring() {
                       : "NO"}
                   </p>
                 </div>
+
               </div>
 
               <div className="mt-3 rounded-xl border border-slate-200 p-3">
@@ -1617,6 +1898,7 @@ export default function CameraMonitoring() {
               )}
 
               <div className="mt-4 grid grid-cols-2 gap-3 text-xs">
+
                 <div className="rounded-xl bg-slate-50 p-3">
                   <p className="text-slate-500">
                     Pose Frames
@@ -1637,12 +1919,13 @@ export default function CameraMonitoring() {
                     {SEQUENCE_LENGTH}
                   </p>
                 </div>
+
               </div>
             </div>
 
             {/* INACTIVITY */}
-
             <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
               <div className="flex items-center gap-3">
                 <div className="rounded-xl bg-orange-100 p-2.5 text-orange-600">
                   <Clock
@@ -1675,7 +1958,9 @@ export default function CameraMonitoring() {
                         : "text-green-600"
                     }`}
                   >
-                    {inactivityStatus}
+                    {
+                      inactivityStatus
+                    }
                   </p>
                 </div>
 
@@ -1698,6 +1983,7 @@ export default function CameraMonitoring() {
                   <AlertTriangle
                     size={17}
                   />
+
                   No activity detected for 5 minutes.
                 </div>
               )}
@@ -1706,8 +1992,8 @@ export default function CameraMonitoring() {
         </div>
 
         {/* RECORDING HISTORY */}
-
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+
           <div className="flex items-center gap-3 border-b border-slate-200 px-5 py-4">
             <div className="rounded-xl bg-blue-100 p-2.5 text-blue-600">
               <Video size={21} />
@@ -1761,7 +2047,9 @@ export default function CameraMonitoring() {
                         </p>
 
                         <p className="mt-1 text-xs text-slate-500">
-                          {recording.camera}{" "}
+                          {
+                            recording.camera
+                          }{" "}
                           •{" "}
                           {formatTime(
                             recording.duration
@@ -1784,6 +2072,7 @@ export default function CameraMonitoring() {
                         <Play
                           size={16}
                         />
+
                         View
                       </button>
 
@@ -1808,7 +2097,6 @@ export default function CameraMonitoring() {
         </div>
 
         {/* SAFETY INFO */}
-
         <div className="flex items-start gap-3 rounded-2xl border border-green-200 bg-green-50 p-5">
           <ShieldCheck
             size={24}
@@ -1821,22 +2109,22 @@ export default function CameraMonitoring() {
             </h3>
 
             <p className="mt-1 text-sm leading-6 text-green-700">
-              Fall detection uses 30-frame pose
-              sequences and a 65% probability
-              threshold. A fall is confirmed after
-              3 consecutive high-probability
-              windows or when the AI backend
-              confirms the event.
+              Fall detection uses 30-frame
+              pose sequences and a 65%
+              probability threshold. A fall is
+              confirmed after 3 consecutive
+              high-probability windows or when
+              the AI backend confirms the event.
             </p>
           </div>
         </div>
       </div>
 
       {/* ADD CAMERA MODAL */}
-
       {showAddCamera && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
@@ -1859,13 +2147,16 @@ export default function CameraMonitoring() {
             </div>
 
             <div className="mt-6 space-y-4">
+
               <div>
                 <label className="mb-2 block text-sm font-semibold text-slate-700">
                   Camera Name
                 </label>
 
                 <input
-                  value={newCameraName}
+                  value={
+                    newCameraName
+                  }
                   onChange={(event) =>
                     setNewCameraName(
                       event.target.value
@@ -1896,9 +2187,12 @@ export default function CameraMonitoring() {
               </div>
 
               <div className="flex gap-3 pt-2">
+
                 <button
                   onClick={() =>
-                    setShowAddCamera(false)
+                    setShowAddCamera(
+                      false
+                    )
                   }
                   className="flex-1 rounded-xl border border-slate-200 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
                 >
@@ -1914,6 +2208,7 @@ export default function CameraMonitoring() {
                 >
                   Add Camera
                 </button>
+
               </div>
             </div>
           </div>
@@ -1921,24 +2216,30 @@ export default function CameraMonitoring() {
       )}
 
       {/* RECORDING MODAL */}
-
       {selectedRecording && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
                 <h2 className="font-bold text-slate-900">
-                  {selectedRecording.name}
+                  {
+                    selectedRecording.name
+                  }
                 </h2>
 
                 <p className="text-xs text-slate-500">
-                  {selectedRecording.camera}
+                  {
+                    selectedRecording.camera
+                  }
                 </p>
               </div>
 
               <button
                 onClick={() =>
-                  setSelectedRecording(null)
+                  setSelectedRecording(
+                    null
+                  )
                 }
                 className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
               >
@@ -1948,7 +2249,9 @@ export default function CameraMonitoring() {
 
             <div className="bg-black">
               <video
-                src={selectedRecording.url}
+                src={
+                  selectedRecording.url
+                }
                 controls
                 autoPlay
                 className="max-h-[70vh] w-full"
