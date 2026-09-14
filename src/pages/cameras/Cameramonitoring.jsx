@@ -20,11 +20,11 @@ import {
 
 const AI_API_URL =
   import.meta.env.VITE_AI_API_URL ||
-  "http://127.0.0.1:8001/predict";
+  "https://vitalcare-professional.onrender.com/predict";
 
 const AI_HEALTH_URL =
   import.meta.env.VITE_AI_HEALTH_URL ||
-  "http://127.0.0.1:8001/health";
+  "https://vitalcare-professional.onrender.com/health";
 
 const SEQUENCE_LENGTH = 30;
 const FEATURE_COUNT = 132;
